@@ -5,8 +5,8 @@ from MultHowKing import mulhowking
 from numpy import array, dot, ones, zeros
 import time
 
-m1 = ones([12500,500], dtype=complex)
-m2 = ones([500,1], dtype=complex)
+m1 = ones([1000,1000], dtype=complex)
+m2 = ones([1000,1000], dtype=complex)
 
 start = time.time()
 res = mulhowking(m1, m2)

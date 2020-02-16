@@ -4,6 +4,7 @@ import sysv_ipc
 from numpy import frombuffer, float32, array, dot, shape
 from subprocess import call
 import time
+
 def mulhowking(m1, m2):
 
     # Declaracion de los ids necesarios para la memoria.
@@ -20,10 +21,10 @@ def mulhowking(m1, m2):
     m2r = array(m2.real, dtype=float32)
     m2i = array(m2.imag, dtype=float32)
 
-    mem_m1r = sysv_ipc.SharedMemory(0x1234, sysv_ipc.IPC_CREAT, size=m1r.nbytes)
-    mem_m1i = sysv_ipc.SharedMemory(0x2345, sysv_ipc.IPC_CREAT, size=m1i.nbytes)
-    mem_m2r = sysv_ipc.SharedMemory(0x3456, sysv_ipc.IPC_CREAT, size=m2r.nbytes)
-    mem_m2i = sysv_ipc.SharedMemory(0x4567, sysv_ipc.IPC_CREAT, size=m2i.nbytes)
+    mem_m1r = sysv_ipc.SharedMemory(shm_key_m1r, sysv_ipc.IPC_CREAT, size=m1r.nbytes)
+    mem_m1i = sysv_ipc.SharedMemory(shm_key_m1i, sysv_ipc.IPC_CREAT, size=m1i.nbytes)
+    mem_m2r = sysv_ipc.SharedMemory(shm_key_m2r, sysv_ipc.IPC_CREAT, size=m2r.nbytes)
+    mem_m2i = sysv_ipc.SharedMemory(shm_key_m2i, sysv_ipc.IPC_CREAT, size=m2i.nbytes)
 
     mem_m1r.write((m1r.tobytes()))
     mem_m1i.write((m1i.tobytes()))
@@ -35,12 +36,10 @@ def mulhowking(m1, m2):
     mem_m2r.detach()
     mem_m2i.detach()
 
-    start = time.time()
     call(["./main.out", str(shape(m1r)[0]), str(shape(m2r)[1]), str(shape(m1r)[1])])
-    end = time.time()
 
-    mem_rer = sysv_ipc.SharedMemory(shm_key_rer)
-    mem_rei = sysv_ipc.SharedMemory(shm_key_rei)
+    mem_rer = sysv_ipc.SharedMemory(shm_key_rer, sysv_ipc.IPC_CREAT, size=4*shape(m1r)[0]*shape(m2r)[1])
+    mem_rei = sysv_ipc.SharedMemory(shm_key_rei, sysv_ipc.IPC_CREAT, size=4*shape(m1r)[0]*shape(m2r)[1])
 
     resultado_real = mem_rer.read()
     resultado_imag = mem_rei.read()
