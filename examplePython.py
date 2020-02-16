@@ -1,9 +1,25 @@
 #!usr/bin/env python
 # encoding: utf-8
 
-from subprocess import call
+from MultHowKing import mulhowking
+from numpy import array, dot, ones, zeros
+import time
 
-a = 10;
-b = 25;
+m1 = ones([12500,500], dtype=complex)
+m2 = ones([500,1], dtype=complex)
 
-call(["./a.out", str(a), str(b)])
+start = time.time()
+res = mulhowking(m1, m2)
+end = time.time()
+
+start1 = time.time()
+res2 = ((dot(m1, m2)).conj())
+end1 = time.time()
+
+print("imprimiendo en c ")
+print(res)
+print("tiempo : " + str(end-start))
+
+print("imprimiendo en python")
+print(res2)
+print("tiempo : " + str(end1-start1))
