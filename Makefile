@@ -1,4 +1,4 @@
-CC = gcc
+CC = $(COMPILER)
 CFLAGS = -c
 OBJS_MAIN = main.o
 DEPEND = multiplicacion
