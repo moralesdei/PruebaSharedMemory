@@ -25,6 +25,7 @@
 #include <time.h>
 #include "CL/opencl.h"
 #include "AOCL_Utils.h"
+
 using namespace aocl_utils;
 
 #define SHM_KEY_M1R 0x1234
@@ -34,7 +35,6 @@ using namespace aocl_utils;
 #define SHM_KEY_RER 0x5678
 #define SHM_KEY_REI 0x6789
 
-
 // OpenCL runtime configuration
 static cl_platform_id platform = NULL;
 static cl_device_id device = NULL;
@@ -42,85 +42,72 @@ static cl_context context = NULL;
 static cl_command_queue queue = NULL;
 static cl_kernel kernel = NULL;
 static cl_program program = NULL;
-static cl_mem kernelm1r, kernelm1i, kernelm2r, kernelm2i, kernelrer, kernelrei;
+static cl_mem buff_m1r, buff_m1i, buff_m2r, buff_m2i, buff_rer, buff_rei;
+static void *m1rH, *m1iH, *m2rH, *m2iH, *rerH, *reiH;
 
-// input and output vectors
-static void *m1r, *m1i, *m2r, *m2i, *rer, *rei;
 bool init();
 void cleanup();
 
-int main(int argc, char *argv[]){ 
+int main(int argc, char *argv[]){
+
 	cl_int status;
+
 	if(!init()){
 			return -1;
 	}
 
-	static const size_t fil_m1 = atoi(argv[1]);
-	static const size_t col_m2 = atoi(argv[2]);
-	static const size_t c1f2 = atoi(argv[3]);
+	const size_t fil_m1 = atoi(argv[1]);
+	const size_t col_m2 = atoi(argv[2]);
+	const size_t c1f2 = atoi(argv[3]);
 
-	int i, j, n, shmid_m1r,shmid_m2r, shmid_m1i, shmid_m2i, shmid_rer, shmid_rei;
-	void *ma1r, *ma1i, *ma2r, *ma2i, *arer, *arei;
+	int shmid_m1r,shmid_m2r, shmid_m1i, shmid_m2i, shmid_rer, shmid_rei;
 
 	shmid_m1i = shmget(SHM_KEY_M1R, sizeof(float)*fil_m1*c1f2, 0644|IPC_CREAT);
 	shmid_m1r = shmget(SHM_KEY_M1I, sizeof(float)*fil_m1*c1f2, 0644|IPC_CREAT);
 	shmid_m2i = shmget(SHM_KEY_M2R, sizeof(float)*c1f2*col_m2, 0644|IPC_CREAT);
 	shmid_m2r = shmget(SHM_KEY_M2I, sizeof(float)*c1f2*col_m2, 0644|IPC_CREAT);
+	shmid_rer = shmget(SHM_KEY_RER, sizeof(float)*fil_m1*col_m2, 0644|IPC_CREAT);
+	shmid_rei = shmget(SHM_KEY_REI, sizeof(float)*fil_m1*col_m2, 0644|IPC_CREAT);
 
-	ma1r = shmat(shmid_m1r, NULL, 0);
-	ma1i = shmat(shmid_m1i, NULL, 0);
-	ma2r = shmat(shmid_m2r, NULL, 0);
-	ma2i = shmat(shmid_m2i, NULL, 0);
 
-	// Create buffers.
-	kernelm1r = clCreateBuffer(context, CL_MEM_ALLOC_HOST_PTR, sizeof(cl_float) * fil_m1 * c1f2, NULL, &status);
+	m1rH = shmat(shmid_m1r, NULL, 0);
+	m1iH = shmat(shmid_m1i, NULL, 0);
+	m2rH = shmat(shmid_m2r, NULL, 0);
+	m2iH = shmat(shmid_m2i, NULL, 0);
+	rerH = shmat(shmid_rer, NULL, 0);
+	reiH = shmat(shmid_rei, NULL, 0);
+
+	// Create buffers
+	buff_m1r = clCreateBuffer(context, CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, sizeof(float) * fil_m1 * c1f2, m1rH, &status);
 	checkError(status, "Failed to create buffer");
-	kernelm1i = clCreateBuffer(context, CL_MEM_ALLOC_HOST_PTR, sizeof(cl_float) * fil_m1 * c1f2, NULL, &status);
+	buff_m1i = clCreateBuffer(context, CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, sizeof(float) * fil_m1 * c1f2, m1iH, &status);
 	checkError(status, "Failed to create buffer");
-	kernelm2r = clCreateBuffer(context, CL_MEM_ALLOC_HOST_PTR, sizeof(cl_float) * c1f2 * col_m2, NULL, &status);
+	buff_m2r = clCreateBuffer(context, CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, sizeof(float) * c1f2 * col_m2, m2rH, &status);
 	checkError(status, "Failed to create buffer");
-	kernelm2i = clCreateBuffer(context, CL_MEM_ALLOC_HOST_PTR, sizeof(cl_float) * c1f2 * col_m2, NULL, &status);
+	buff_m2i = clCreateBuffer(context, CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, sizeof(float) * c1f2 * col_m2, m2iH, &status);
 	checkError(status, "Failed to create buffer");
-	kernelrer = clCreateBuffer(context, CL_MEM_ALLOC_HOST_PTR, sizeof(cl_float) * fil_m1 * col_m2, NULL, &status);
+	buff_rer = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(float) * fil_m1 * col_m2, NULL, &status);
 	checkError(status, "Failed to create buffer");
-	kernelrei = clCreateBuffer(context, CL_MEM_ALLOC_HOST_PTR, sizeof(cl_float) * fil_m1 * col_m2, NULL, &status);
+	buff_rei = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(float) * fil_m1 * col_m2, NULL, &status);
 	checkError(status, "Failed to create buffer");
 
-	m1r = clEnqueueMapBuffer(queue, kernelm1r, CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(cl_float) * fil_m1 * c1f2, 0, NULL, NULL, NULL);
-	m1i = clEnqueueMapBuffer(queue, kernelm1i, CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(cl_float) * fil_m1 * c1f2, 0, NULL, NULL, NULL);
-	m2r = clEnqueueMapBuffer(queue, kernelm2r, CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(cl_float) * c1f2 * col_m2, 0, NULL, NULL, NULL);
-	m2i = clEnqueueMapBuffer(queue, kernelm2i, CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(cl_float) * c1f2 * col_m2, 0, NULL, NULL, NULL);
-	rer = clEnqueueMapBuffer(queue, kernelrer, CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(cl_float) * fil_m1 * col_m2, 0, NULL, NULL, NULL);
-	rei = clEnqueueMapBuffer(queue, kernelrei, CL_TRUE, CL_MAP_WRITE|CL_MAP_READ, 0, sizeof(cl_float) * fil_m1 * col_m2, 0, NULL, NULL, NULL);
-
-	status = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void*)&kernelm1r);
+	// Set kernel arguments
+	status = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void*)&buff_m1r);
 	checkError(status, "Failed to set kernel arg 0");
-
-	status = clSetKernelArg(kernel, 1, sizeof(cl_mem), (void*)&kernelm1i);
+	status = clSetKernelArg(kernel, 1, sizeof(cl_mem), (void*)&buff_m1i);
 	checkError(status, "Failed to set kernel arg 1");
-
-	status = clSetKernelArg(kernel, 2, sizeof(cl_mem), (void*)&kernelm2r);
+	status = clSetKernelArg(kernel, 2, sizeof(cl_mem), (void*)&buff_m2r);
 	checkError(status, "Failed to set kernel arg 2");
-
-	status = clSetKernelArg(kernel, 3, sizeof(cl_mem), (void*)&kernelm2i);
+	status = clSetKernelArg(kernel, 3, sizeof(cl_mem), (void*)&buff_m2i);
 	checkError(status, "Failed to set kernel arg 3");
-
-	status = clSetKernelArg(kernel, 4, sizeof(cl_mem), (void*)&kernelrer);
+	status = clSetKernelArg(kernel, 4, sizeof(cl_mem), (void*)&buff_rer);
 	checkError(status, "Failed to set kernel arg 4");
-
-	status = clSetKernelArg(kernel, 5, sizeof(cl_mem), (void*)&kernelrei);
+	status = clSetKernelArg(kernel, 5, sizeof(cl_mem), (void*)&buff_rei);
 	checkError(status, "Failed to set kernel arg 5");
-
 	status = clSetKernelArg(kernel, 6, sizeof(cl_mem), (void*)&c1f2);
 	checkError(status, "Failed to set kernel arg 6");
-
 	status = clSetKernelArg(kernel, 7, sizeof(cl_mem), (void*)&col_m2);
 	checkError(status, "Failed to set kernel arg 7");
-
-	memcpy((m1r), ma1r, sizeof(cl_float) * fil_m1 * c1f2);
-	memcpy((m1i), ma1i, sizeof(cl_float) * fil_m1 * c1f2);
-	memcpy((m2r), ma2r, sizeof(cl_float) * c1f2 * col_m2);
-	memcpy((m2i), ma2i, sizeof(cl_float) * c1f2 * col_m2);
 
 	// Configure work set over which the kernel will execute
 	size_t gSize[2] = {fil_m1, col_m2};
@@ -129,62 +116,55 @@ int main(int argc, char *argv[]){
 	status = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, gSize, gSize, 0, NULL, NULL);
 	checkError(status, "Failed to launch kernel");
 
-	// Wait for command queue to complete pending events
-	status = clFinish(queue);
-	checkError(status, "Failed to finish");
+	// Read buffer output
+	status = clEnqueueReadBuffer(queue, buff_rer, CL_TRUE, 0, sizeof(float) * fil_m1 * col_m2, rerH, 0, NULL, NULL);
+	checkError(status, "Failed to read buffer");
+	status = clEnqueueReadBuffer(queue, buff_rei, CL_TRUE, 0, sizeof(float) * fil_m1 * col_m2, reiH, 0, NULL, NULL);
+	checkError(status, "Failed to read buffer");
 
-	shmdt(ma1r);
-	shmdt(ma1i);
-	shmdt(ma2r);
-	shmdt(ma2r);
+  cleanup();
+
+	shmdt(rerH);
+	shmdt(reiH);
+	shmdt(m1rH);
+	shmdt(m1iH);
+	shmdt(m2rH);
+	shmdt(m2rH);
 
 	shmctl(shmid_m1i, IPC_RMID, 0);
 	shmctl(shmid_m1r, IPC_RMID, 0);
 	shmctl(shmid_m2i, IPC_RMID, 0);
 	shmctl(shmid_m2r, IPC_RMID, 0);
 
-	shmid_rer = shmget(SHM_KEY_RER, sizeof(float)*fil_m1*col_m2, 0644|IPC_CREAT);
-	shmid_rei = shmget(SHM_KEY_REI, sizeof(float)*fil_m1*col_m2, 0644|IPC_CREAT);
-
-	arer = shmat(shmid_rer, NULL, 0);
-	arei = shmat(shmid_rei, NULL, 0);
-
-	memcpy(arer, rer, sizeof(cl_float) * fil_m1 * col_m2);
-	memcpy(arei, rei, sizeof(cl_float) * fil_m1 * col_m2);
-
-	shmdt(arer);
-	shmdt(arei);
-
-	cleanup();
 	return 0;
 
 }
 
 void cleanup() {
 
-	if(kernelm1r) {
-		clEnqueueUnmapMemObject(queue, kernelm1r, m1r, 0, NULL, NULL);
-		clReleaseMemObject(kernelm1r);
+	if(buff_m1r) {
+		clEnqueueUnmapMemObject(queue, buff_m1r, m1rH, 0, NULL, NULL);
+		clReleaseMemObject(buff_m1r);
 	}
-	if(kernelm1i) {
-		clEnqueueUnmapMemObject(queue, kernelm1i, m1i, 0, NULL, NULL);
-		clReleaseMemObject(kernelm1i);
+	if(buff_m1i) {
+		clEnqueueUnmapMemObject(queue, buff_m1i, m1iH, 0, NULL, NULL);
+		clReleaseMemObject(buff_m1i);
 	}
-  if(kernelm2r) {
-		clEnqueueUnmapMemObject(queue, kernelm2r, m2r, 0, NULL, NULL);
-		clReleaseMemObject(kernelm2r);
+  if(buff_m2r) {
+		clEnqueueUnmapMemObject(queue, buff_m2r, m2rH, 0, NULL, NULL);
+		clReleaseMemObject(buff_m2r);
 	}
-if(kernelm2i) {
-		clEnqueueUnmapMemObject(queue, kernelm2i, m2i, 0, NULL, NULL);
-		clReleaseMemObject(kernelm2i);
+if(buff_m2i) {
+		clEnqueueUnmapMemObject(queue, buff_m2i, m2iH, 0, NULL, NULL);
+		clReleaseMemObject(buff_m2i);
 	}
-	if(kernelrer) {
-		clEnqueueUnmapMemObject(queue, kernelrer, rer, 0, NULL, NULL);
-		clReleaseMemObject(kernelrer);
+	if(buff_rer) {
+		clEnqueueUnmapMemObject(queue, buff_rer, rerH, 0, NULL, NULL);
+		clReleaseMemObject(buff_rer);
 	}
-	if(kernelrei) {
-		clEnqueueUnmapMemObject(queue, kernelrei, rei, 0, NULL, NULL);
-		clReleaseMemObject(kernelrei);
+	if(buff_rei) {
+		clEnqueueUnmapMemObject(queue, buff_rei, reiH, 0, NULL, NULL);
+		clReleaseMemObject(buff_rei);
 	}
 	if(kernel) {
 		clReleaseKernel(kernel);
