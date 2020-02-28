@@ -21,10 +21,12 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <string.h>
 #include <time.h>
 #include "CL/opencl.h"
 #include "AOCL_Utils.h"
+#include "matrixMult.h"
 
 using namespace aocl_utils;
 
@@ -47,8 +49,10 @@ static void *m1rH, *m1iH, *m2rH, *m2iH, *rerH, *reiH;
 
 bool init();
 void cleanup();
+double get_wall_time();
 
 int main(int argc, char *argv[]){
+
 
 	cl_int status;
 
@@ -77,6 +81,12 @@ int main(int argc, char *argv[]){
 	rerH = shmat(shmid_rer, NULL, 0);
 	reiH = shmat(shmid_rei, NULL, 0);
 
+	//size_t a;
+	//status = clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(cl_uint), &a, NULL);
+	//printf("%zd\n", a);
+
+	double wall0 = get_wall_time();
+
 	// Create buffers
 	buff_m1r = clCreateBuffer(context, CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, sizeof(float) * fil_m1 * c1f2, m1rH, &status);
 	checkError(status, "Failed to create buffer");
@@ -104,16 +114,18 @@ int main(int argc, char *argv[]){
 	checkError(status, "Failed to set kernel arg 4");
 	status = clSetKernelArg(kernel, 5, sizeof(cl_mem), (void*)&buff_rei);
 	checkError(status, "Failed to set kernel arg 5");
-	status = clSetKernelArg(kernel, 6, sizeof(cl_mem), (void*)&c1f2);
+	status = clSetKernelArg(kernel, 6, sizeof(cl_mem), (void*)&col_m2);
 	checkError(status, "Failed to set kernel arg 6");
-	status = clSetKernelArg(kernel, 7, sizeof(cl_mem), (void*)&col_m2);
+	status = clSetKernelArg(kernel, 7, sizeof(cl_mem), (void*)&c1f2);
 	checkError(status, "Failed to set kernel arg 7");
 
 	// Configure work set over which the kernel will execute
-	size_t gSize[2] = {fil_m1, col_m2};
+
+	size_t local[2] = {BLOCK_SIZE, BLOCK_SIZE};
+	size_t global[2] = {fil_m1, col_m2};
 
 	// Launch the kernel
-	status = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, gSize, gSize, 0, NULL, NULL);
+	status = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, global, local, 0, NULL, NULL);
 	checkError(status, "Failed to launch kernel");
 
 	// Read buffer output
@@ -121,6 +133,9 @@ int main(int argc, char *argv[]){
 	checkError(status, "Failed to read buffer");
 	status = clEnqueueReadBuffer(queue, buff_rei, CL_TRUE, 0, sizeof(float) * fil_m1 * col_m2, reiH, 0, NULL, NULL);
 	checkError(status, "Failed to read buffer");
+
+	double wall1 = get_wall_time();
+	printf("El wall time es igual a : %f", wall1 - wall0 );
 
   cleanup();
 
@@ -221,4 +236,13 @@ bool init() {
 	checkError(status, "Failed to create kernel");
 
 	return true;
+}
+
+double get_wall_time(){
+    struct timeval time;
+    if (gettimeofday(&time,NULL)){
+        //  Handle error
+        return 0;
+    }
+    return (double)time.tv_sec + (double)time.tv_usec * .000001;
 }

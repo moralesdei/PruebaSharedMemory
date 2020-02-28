@@ -6,7 +6,7 @@ from numpy import array, dot, ones, zeros
 import time
 
 m1 = ones([12500,500], dtype=complex)
-m2 = ones([500,1], dtype=complex)
+m2 = ones([500,500], dtype=complex)
 
 start_p = time.time()
 resultado_python = ((dot(m1, m2)).conj())
