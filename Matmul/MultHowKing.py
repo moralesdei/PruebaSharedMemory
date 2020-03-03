@@ -14,11 +14,13 @@ def mulhowking(m1, m2):
 	shm_key_rer = 0x5678;
 	shm_key_rei = 0x6789;
 
+
 	m1r = array(m1.real, dtype=float32)
 	m1i = array(m1.imag, dtype=float32)
 	m2r = array(m2.real, dtype=float32)
 	m2i = array(m2.imag, dtype=float32)
 
+	start_p = time.time()
 	mem_m1r = sysv_ipc.SharedMemory(shm_key_m1r, sysv_ipc.IPC_CREAT, size=m1r.nbytes)
 	mem_m1i = sysv_ipc.SharedMemory(shm_key_m1i, sysv_ipc.IPC_CREAT, size=m1i.nbytes)
 	mem_m2r = sysv_ipc.SharedMemory(shm_key_m2r, sysv_ipc.IPC_CREAT, size=m2r.nbytes)
@@ -46,6 +48,10 @@ def mulhowking(m1, m2):
 	mem_rei.detach()
 	mem_rer.remove()
 	mem_rei.remove()
+
+	end_p = time.time()
+	print("\nTiempo de ejecucion de la funcion (segundos) : " + str(end_p-start_p))
+
 
 	resr = frombuffer(resultado_real, dtype=float32)
 	resi = frombuffer(resultado_imag, dtype=float32)
