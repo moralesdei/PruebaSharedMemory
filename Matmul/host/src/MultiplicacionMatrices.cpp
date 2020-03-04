@@ -66,11 +66,15 @@ int main(int argc, char *argv[]){
 			return -1;
 	}
 
-	int pad_c1f2, pad_col_m2, pad_fil_m1;
-	int col_m2, fil_m1, c1f2;
+	size_t pad_c1f2, pad_col_m2, pad_fil_m1;
+	size_t col_m2, fil_m1, c1f2;
 	fil_m1 = atoi(argv[1]);
 	col_m2 = atoi(argv[2]);
 	c1f2 = atoi(argv[3]);
+
+	printf("%d ", fil_m1);
+	printf("%d ", col_m2);
+	printf("%d ", c1f2);
 
 	int shmid_m1r,shmid_m2r, shmid_m1i, shmid_m2i, shmid_rer, shmid_rei;
   pad_fil_m1 = fil_m1;
