@@ -62,19 +62,13 @@ void multiply(int, int, cl_mem, cl_mem, cl_mem, cl_mem, cl_mem, cl_mem, int, int
 
 int main(int argc, char *argv[]){
 
-	if(!init()){
-			return -1;
-	}
+	double wall0 = get_wall_time();
 
 	size_t pad_c1f2, pad_col_m2, pad_fil_m1;
 	size_t col_m2, fil_m1, c1f2;
 	fil_m1 = atoi(argv[1]);
 	col_m2 = atoi(argv[2]);
 	c1f2 = atoi(argv[3]);
-
-	printf("%d ", fil_m1);
-	printf("%d ", col_m2);
-	printf("%d ", c1f2);
 
 	int shmid_m1r,shmid_m2r, shmid_m1i, shmid_m2i, shmid_rer, shmid_rei;
   pad_fil_m1 = fil_m1;
@@ -105,6 +99,9 @@ int main(int argc, char *argv[]){
 				}
 	}
 
+	double wall1 = get_wall_time();
+	printf("Tiempo de inicializacion de variables y hallar padding (en c): %f", wall1 - wall0 );
+
 	shmid_m1r = shmget(SHM_KEY_M1R, sizeof(float)*fil_m1*c1f2, 0644|IPC_CREAT);
 	shmid_m1i = shmget(SHM_KEY_M1I, sizeof(float)*fil_m1*c1f2, 0644|IPC_CREAT);
 	shmid_m2r = shmget(SHM_KEY_M2R, sizeof(float)*c1f2*col_m2, 0644|IPC_CREAT);
@@ -119,7 +116,12 @@ int main(int argc, char *argv[]){
 	rerH = (float *)shmat(shmid_rer, NULL, 0);
 	reiH = (float *)shmat(shmid_rei, NULL, 0);
 
-	double wall0 = get_wall_time();
+	double wall2 = get_wall_time();
+	printf("\nTiempo de leer la shared memory y traer los datos (en c): %f", wall2 - wall1 );
+
+	if(!init()){
+			return -1;
+	}
 
 	// Create buffers
 	buff_m1r = clCreateBuffer(context, CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, sizeof(float)*fil_m1*c1f2, (void*)m1rH, &status);
@@ -192,7 +194,7 @@ int main(int argc, char *argv[]){
 
 			addpad(c1f2, pad_col_m2, c1f2, col_m2, buff_m2r, c1f2, pad_col_m2, buff_m2r_pad);
 			addpad(c1f2, pad_col_m2, c1f2, col_m2, buff_m2i, c1f2, pad_col_m2, buff_m2i_pad);
-			multiply(fil_m1, pad_col_m2, buff_m1r, buff_m1i, buff_m2r_pad, buff_m2i_pad, buff_rer_pad, buff_rei_pad, fil_m1, c1f2);
+			multiply(fil_m1, pad_col_m2, buff_m1r, buff_m1i, buff_m2r_pad, buff_m2i_pad, buff_rer_pad, buff_rei_pad, fil_m1, pad_c1f2);
 			removepad(fil_m1, pad_col_m2, fil_m1, col_m2, buff_rer_pad, fil_m1, pad_col_m2, buff_rer);
 			removepad(fil_m1, pad_col_m2, fil_m1, col_m2, buff_rei_pad, fil_m1, pad_col_m2, buff_rei);
 
@@ -208,10 +210,10 @@ int main(int argc, char *argv[]){
 	status = clEnqueueReadBuffer(queue, buff_rei, CL_TRUE, 0, sizeof(float) * fil_m1 * col_m2, (void*)reiH, 0, NULL, NULL);
 	checkError(status, "Failed to read buffer");
 
-	double wall1 = get_wall_time();
-	printf("\nEl wall time es igual a : %f", wall1 - wall0 );
-
 	cleanup();
+
+	double wall3 = get_wall_time();
+	printf("\nTiempo de opencl (en c): %f", wall3 - wall2 );
 
 	shmdt(rerH);
 	shmdt(reiH);
@@ -224,6 +226,9 @@ int main(int argc, char *argv[]){
 	shmctl(shmid_m1r, IPC_RMID, 0);
 	shmctl(shmid_m2i, IPC_RMID, 0);
 	shmctl(shmid_m2r, IPC_RMID, 0);
+
+	double wall4 = get_wall_time();
+	printf("\nTiempo del script de c completo (en c): %f\n", wall4 - wall0 );
 
 	return 0;
 
