@@ -56,18 +56,15 @@ static cl_int status;
 bool init();
 void cleanup();
 double get_wall_time();
-void addpad(int, int, int, int, cl_mem, int, int, cl_mem);
-void removepad(int, int, int, int, cl_mem, int, int, cl_mem);
+void addpad(int, int, int, int, cl_mem, int, cl_mem);
+void removepad(int, int, int, int, cl_mem, int, cl_mem);
 void multiply(int, int, cl_mem, cl_mem, cl_mem, cl_mem, cl_mem, cl_mem, int, int);
 
 int main(int argc, char *argv[]){
 
-	if(!init()){
-			return -1;
-	}
 
-	int pad_c1f2, pad_col_m2, pad_fil_m1;
-	int col_m2, fil_m1, c1f2;
+	size_t pad_c1f2, pad_col_m2, pad_fil_m1;
+	size_t col_m2, fil_m1, c1f2;
 	fil_m1 = atoi(argv[1]);
 	col_m2 = atoi(argv[2]);
 	c1f2 = atoi(argv[3]);
@@ -101,6 +98,8 @@ int main(int argc, char *argv[]){
 				}
 	}
 
+
+
 	shmid_m1r = shmget(SHM_KEY_M1R, sizeof(float)*fil_m1*c1f2, 0644|IPC_CREAT);
 	shmid_m1i = shmget(SHM_KEY_M1I, sizeof(float)*fil_m1*c1f2, 0644|IPC_CREAT);
 	shmid_m2r = shmget(SHM_KEY_M2R, sizeof(float)*c1f2*col_m2, 0644|IPC_CREAT);
@@ -115,7 +114,11 @@ int main(int argc, char *argv[]){
 	rerH = (float *)shmat(shmid_rer, NULL, 0);
 	reiH = (float *)shmat(shmid_rei, NULL, 0);
 
-	double wall0 = get_wall_time();
+
+
+	if(!init()){
+			return -1;
+	}
 
 	// Create buffers
 	buff_m1r = clCreateBuffer(context, CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR, sizeof(float)*fil_m1*c1f2, (void*)m1rH, &status);
@@ -147,13 +150,13 @@ int main(int argc, char *argv[]){
 			buff_rei_pad = clCreateBuffer(context, CL_MEM_ALLOC_HOST_PTR, sizeof(float)*pad_fil_m1*pad_col_m2, NULL, &status);
 			checkError(status, "Failed to create buffer");
 
-			addpad(pad_fil_m1, pad_c1f2, fil_m1, c1f2, buff_m1r, pad_fil_m1, pad_c1f2, buff_m1r_pad);
-			addpad(pad_fil_m1, pad_c1f2, fil_m1, c1f2, buff_m1i, pad_fil_m1, pad_c1f2, buff_m1i_pad);
-			addpad(pad_c1f2, pad_col_m2, c1f2, col_m2, buff_m2r, pad_c1f2, pad_col_m2, buff_m2r_pad);
-			addpad(pad_c1f2, pad_col_m2, c1f2, col_m2, buff_m2i, pad_c1f2, pad_col_m2, buff_m2i_pad);
+			addpad(pad_fil_m1, pad_c1f2, fil_m1, c1f2, buff_m1r, pad_fil_m1,  buff_m1r_pad);
+			addpad(pad_fil_m1, pad_c1f2, fil_m1, c1f2, buff_m1i, pad_fil_m1,  buff_m1i_pad);
+			addpad(pad_c1f2, pad_col_m2, c1f2, col_m2, buff_m2r, pad_c1f2,  buff_m2r_pad);
+			addpad(pad_c1f2, pad_col_m2, c1f2, col_m2, buff_m2i, pad_c1f2,  buff_m2i_pad);
 			multiply(pad_fil_m1, pad_col_m2, buff_m1r_pad, buff_m1i_pad, buff_m2r_pad, buff_m2i_pad, buff_rer_pad, buff_rei_pad, pad_fil_m1, pad_c1f2);
-			removepad(pad_fil_m1, pad_col_m2, fil_m1, col_m2, buff_rer_pad, pad_fil_m1, pad_col_m2, buff_rer);
-			removepad(pad_fil_m1, pad_col_m2, fil_m1, col_m2, buff_rei_pad, pad_fil_m1, pad_col_m2, buff_rei);
+			removepad(pad_fil_m1, pad_col_m2, fil_m1, col_m2, buff_rer_pad, pad_fil_m1,  buff_rer);
+			removepad(pad_fil_m1, pad_col_m2, fil_m1, col_m2, buff_rei_pad, pad_fil_m1,  buff_rei);
 
 		}
 	else if(flag_m1)
@@ -168,11 +171,11 @@ int main(int argc, char *argv[]){
 			checkError(status, "Failed to create buffer");
 
 
-			addpad(pad_fil_m1, c1f2, fil_m1, c1f2, buff_m1r, pad_fil_m1, c1f2, buff_m1r_pad);
-			addpad(pad_fil_m1, c1f2, fil_m1, c1f2, buff_m1i, pad_fil_m1, c1f2, buff_m1i_pad);
+			addpad(pad_fil_m1, c1f2, fil_m1, c1f2, buff_m1r, pad_fil_m1, buff_m1r_pad);
+			addpad(pad_fil_m1, c1f2, fil_m1, c1f2, buff_m1i, pad_fil_m1, buff_m1i_pad);
 			multiply(pad_fil_m1, col_m2, buff_m1r_pad, buff_m1i_pad, buff_m2r, buff_m2i, buff_rer_pad, buff_rei_pad, pad_fil_m1, c1f2);
-			removepad(pad_fil_m1, col_m2, fil_m1, col_m2, buff_rer_pad, pad_fil_m1, col_m2, buff_rer);
-			removepad(pad_fil_m1, col_m2, fil_m1, col_m2, buff_rei_pad, pad_fil_m1, col_m2, buff_rei);
+			removepad(pad_fil_m1, col_m2, fil_m1, col_m2, buff_rer_pad, pad_fil_m1, buff_rer);
+			removepad(pad_fil_m1, col_m2, fil_m1, col_m2, buff_rei_pad, pad_fil_m1, buff_rei);
 		}
 	else if(flag_m2)
 		{
@@ -186,11 +189,11 @@ int main(int argc, char *argv[]){
 			checkError(status, "Failed to create buffer");
 
 
-			addpad(c1f2, pad_col_m2, c1f2, col_m2, buff_m2r, c1f2, pad_col_m2, buff_m2r_pad);
-			addpad(c1f2, pad_col_m2, c1f2, col_m2, buff_m2i, c1f2, pad_col_m2, buff_m2i_pad);
-			multiply(fil_m1, pad_col_m2, buff_m1r, buff_m1i, buff_m2r_pad, buff_m2i_pad, buff_rer_pad, buff_rei_pad, fil_m1, c1f2);
-			removepad(fil_m1, pad_col_m2, fil_m1, col_m2, buff_rer_pad, fil_m1, pad_col_m2, buff_rer);
-			removepad(fil_m1, pad_col_m2, fil_m1, col_m2, buff_rei_pad, fil_m1, pad_col_m2, buff_rei);
+			addpad(c1f2, pad_col_m2, c1f2, col_m2, buff_m2r, c1f2, buff_m2r_pad);
+			addpad(c1f2, pad_col_m2, c1f2, col_m2, buff_m2i, c1f2, buff_m2i_pad);
+			multiply(fil_m1, pad_col_m2, buff_m1r, buff_m1i, buff_m2r_pad, buff_m2i_pad, buff_rer_pad, buff_rei_pad, fil_m1, pad_c1f2);
+			removepad(fil_m1, pad_col_m2, fil_m1, col_m2, buff_rer_pad, fil_m1, buff_rer);
+			removepad(fil_m1, pad_col_m2, fil_m1, col_m2, buff_rei_pad, fil_m1, buff_rei);
 
 		}
 	else
@@ -204,10 +207,9 @@ int main(int argc, char *argv[]){
 	status = clEnqueueReadBuffer(queue, buff_rei, CL_TRUE, 0, sizeof(float) * fil_m1 * col_m2, (void*)reiH, 0, NULL, NULL);
 	checkError(status, "Failed to read buffer");
 
-	double wall1 = get_wall_time();
-	printf("\nEl wall time es igual a : %f", wall1 - wall0 );
-
 	cleanup();
+
+
 
 	shmdt(rerH);
 	shmdt(reiH);
@@ -220,6 +222,8 @@ int main(int argc, char *argv[]){
 	shmctl(shmid_m1r, IPC_RMID, 0);
 	shmctl(shmid_m2i, IPC_RMID, 0);
 	shmctl(shmid_m2r, IPC_RMID, 0);
+
+
 
 	return 0;
 
@@ -353,9 +357,10 @@ double get_wall_time(){
     return (double)time.tv_sec + (double)time.tv_usec * .000001;
 }
 
-void addpad(int f, int c, int arg0, int arg1, cl_mem arg2, int arg3, int arg4, cl_mem arg5){
+void addpad(int f, int c, int arg0, int arg1, cl_mem arg2, int arg3, cl_mem arg4){
 
 		size_t global[2] = {f, c};
+
 		// Set kernel arguments add pad
 		status = clSetKernelArg(kernelA, 0, sizeof(int), (void*)&arg0);
 		checkError(status, "Failed to set kernel arg 0");
@@ -365,9 +370,7 @@ void addpad(int f, int c, int arg0, int arg1, cl_mem arg2, int arg3, int arg4, c
 		checkError(status, "Failed to set kernel arg 2");
 		status = clSetKernelArg(kernelA, 3, sizeof(int), (void*)&arg3);
 		checkError(status, "Failed to set kernel arg 3");
-		status = clSetKernelArg(kernelA, 4, sizeof(int), (void*)&arg4);
-		checkError(status, "Failed to set kernel arg 4");
-		status = clSetKernelArg(kernelA, 5, sizeof(cl_mem), (void*)&arg5);
+		status = clSetKernelArg(kernelA, 4, sizeof(cl_mem), (void*)&arg4);
 		checkError(status, "Failed to set kernel arg 5");
 
 		// Launch the kernel add pad
@@ -375,7 +378,7 @@ void addpad(int f, int c, int arg0, int arg1, cl_mem arg2, int arg3, int arg4, c
 		checkError(status, "Failed to launch kernel");
 	}
 
-void removepad(int f, int c, int arg0, int arg1, cl_mem arg2, int arg3, int arg4, cl_mem arg5){
+void removepad(int f, int c, int arg0, int arg1, cl_mem arg2, int arg3, cl_mem arg4){
 
 		size_t global[2] = {f, c};
 		// Set kernel arguments remove pad
@@ -387,9 +390,7 @@ void removepad(int f, int c, int arg0, int arg1, cl_mem arg2, int arg3, int arg4
 		checkError(status, "Failed to set kernel arg 2");
 		status = clSetKernelArg(kernelR, 3, sizeof(int), (void*)&arg3);
 		checkError(status, "Failed to set kernel arg 3");
-		status = clSetKernelArg(kernelR, 4, sizeof(int), (void*)&arg4);
-		checkError(status, "Failed to set kernel arg 4");
-		status = clSetKernelArg(kernelR, 5, sizeof(cl_mem), (void*)&arg5);
+		status = clSetKernelArg(kernelR, 4, sizeof(cl_mem), (void*)&arg4);
 		checkError(status, "Failed to set kernel arg 5");
 
 		// Launch the kernel remove pad
